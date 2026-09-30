@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3 в ряд</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            color: white;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 8px;
+            background: linear-gradient(45deg, #feca57, #ff6b6b, #48dbfb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .top-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .stat {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 5px 12px;
+            text-align: center;
+            min-width: 70px;
+        }
+        
+        .stat .label { font-size: 0.65em; color: #feca57; text-transform: uppercase; }
+        .stat .value { font-size: 1.2em; font-weight: bold; color: #48dbfb; }
+        
+        .board-container {
+            position: relative;
+            background: rgba(0,0,0,0.5);
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            padding: 6px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        
+        #game-board {
+            position: relative;
+            width: 360px;
+            height: 360px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .crystal {
+            position: absolute;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.25);
+            user-select: none;
+            overflow: hidden;
+            will-change: transform;
+            transform: translate3d(0,0,0);
+            backface-visibility: hidden;
+        }
+        
+        .crystal svg {
+            width: 32px;
+            height: 32px;
+            pointer-events: none;
+        }
+        
+        .crystal.selected {
+            box-shadow: 0 0 15px #fff, 0 0 25px #feca57;
+            z-index: 100;
+            animation: pulse 0.5s infinite;
+        }
+        
+        .crystal.hint {
+            animation: hintPulse 0.8s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: translate3d(0,0,0) scale(1); }
+            50% { transform: translate3d(0,0,0) scale(1.1); }
+        }
+        
+        @keyframes hintPulse {
+            0%, 100% { box-shadow: 0 0 8px #feca57, 0 2px 4px rgba(0,0,0,0.4); }
+            50% { box-shadow: 0 0 20px #feca57, 0 0 30px #f39c12; }
+        }
+        
+        .crystal.matching {
+            animation: matchPop 0.25s ease-out forwards;
+        }
+        
+        @keyframes matchPop {
+            0% { transform: translate3d(0,0,0) scale(1); opacity: 1; }
+            100% { transform: translate3d(0,0,0) scale(0); opacity: 0; }
+        }
+        
+        .type-0 { background: linear-gradient(135deg, #ff6b6b 0%, #c0392b 100%); }
+        .type-1 { background: linear-gradient(135deg, #feca57 0%, #f39c12 100%); }
+        .type-2 { background: linear-gradient(135deg, #48dbfb 0%, #0984e3 100%); }
+        .type-3 { background: linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%); }
+        .type-4 { background: linear-gradient(135deg, #ff9ff3 0%, #f368e0 100%); }
+        .type-5 { background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%); }
+        
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 8px 16px;
+            font-size: 0.9em;
+            background: linear-gradient(135deg, #feca57, #f39c12);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+        }
+        
+        button:active { transform: scale(0.95); }
+        
+        .combo-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #feca57;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 200;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+        }
+        
+        .combo-text.show { animation: comboAnim 0.8s ease-out; }
+        
+        @keyframes comboAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+            30% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -100%) scale(1); }
+        }
+        
+        .message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 25px 35px;
+            border-radius: 15px;
+            text-align: center;
+            border: 3px solid #feca57;
+            box-shadow: 0 0 50px rgba(254,202,87,0.6);
+            display: none;
+            z-index: 1000;
+        }
+        
+        .message h2 { font-size: 1.8em; color: #feca57; margin-bottom: 12px; }
+        .message p { font-size: 1.1em; margin-bottom: 15px; }
+        .message button { margin: 5px; }
+        
+        @media (max-width: 420px) {
+            #game-board { width: 320px; height: 320px; }
+            .crystal { width: 37px; height: 37px; }
+            .crystal svg { width: 28px; height: 28px; }
+            h1 { font-size: 1.4em; }
+        }
+    </style>
+</head>
+<body>
+    <h1>💎 3 В РЯД 💎</h1>
+    
+    <div class="top-bar">
+        <div class="stat"><div class="label">Счёт</div><div class="value" id="score">0</div></div>
+        <div class="stat"><div class="label">Уровень</div><div class="value" id="level">1</div></div>
+        <div class="stat"><div class="label">Ходы</div><div class="value" id="moves">30</div></div>
+        <div class="stat"><div class="label">Цель</div><div class="value" id="target">1000</div></div>
+    </div>
+    
+    <div class="board-container">
+        <div id="game-board"></div>
+        <div class="combo-text" id="combo-text"></div>
+    </div>
+    
+    <div class="controls">
+        <button onclick="newGame()">Новая игра</button>
+        <button onclick="shuffleBoard()">Перемешать</button>
+        <button onclick="showHint()">Подсказка</button>
+    </div>
+    
+    <div class="message" id="message">
+        <h2 id="msg-title"></h2>
+        <p id="msg-text"></p>
+        <button onclick="nextLevel()">Следующий уровень</button>
+        <button onclick="newGame()">Новая игра</button>
+    </div>
+
+    <script>
+        const SIZE = 8;
+        const TYPES = 6;
+        const CELL_SIZE = 42;
+        const GAP = 3;
+        const STEP = CELL_SIZE + GAP;
+        
+        const svgTemplates = [];
+        const templateContainer = document.createElement('div');
+        templateContainer.style.display = 'none';
+        document.body.appendChild(templateContainer);
+        
+        const SHAPES_SVG = [
+            `<svg viewBox="0 0 32 32"><defs><linearGradient id="d0" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#ff9999"/><stop offset="50%" style="stop-color:#ff4444"/><stop offset="100%" style="stop-color:#990000"/></linearGradient></defs><polygon points="16,3 27,13 16,29 5,13" fill="url(#d0)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,3 22,13 16,29" fill="rgba(255,255,255,0.25)"/><line x1="5" y1="13" x2="27" y2="13" stroke="#fff" stroke-width="1" opacity="0.6"/></svg>`,
+            `<svg viewBox="0 0 32 32"><defs><radialGradient id="s1" cx="40%" cy="35%"><stop offset="0%" style="stop-color:#ffff99"/><stop offset="60%" style="stop-color:#ffcc00"/><stop offset="100%" style="stop-color:#cc8800"/></radialGradient></defs><polygon points="16,3 19,12 29,12 21,18 24,28 16,22 8,28 11,18 3,12 13,12" fill="url(#s1)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+            `<svg viewBox="0 0 32 32"><defs><radialGradient id="c2" cx="35%" cy="35%"><stop offset="0%" style="stop-color:#ccf5ff"/><stop offset="50%" style="stop-color:#00ccff"/><stop offset="100%" style="stop-color:#006699"/></radialGradient></defs><circle cx="16" cy="16" r="12" fill="url(#c2)" stroke="#fff" stroke-width="1.5"/><circle cx="16" cy="16" r="6" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.7"/><circle cx="11" cy="11" r="2.5" fill="#fff" opacity="0.6"/></svg>`,
+            `<svg viewBox="0 0 32 32"><defs><linearGradient id="t3" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" style="stop-color:#99ffcc"/><stop offset="50%" style="stop-color:#00cc88"/><stop offset="100%" style="stop-color:#006644"/></linearGradient></defs><polygon points="16,4 28,27 4,27" fill="url(#t3)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,10 22,22 10,22" fill="rgba(255,255,255,0.2)" stroke="#fff" stroke-width="1" opacity="0.6"/></svg>`,
+            `<svg viewBox="0 0 32 32"><defs><radialGradient id="h4" cx="40%" cy="35%"><stop offset="0%" style="stop-color:#ffddee"/><stop offset="60%" style="stop-color:#ff66cc"/><stop offset="100%" style="stop-color:#cc3399"/></radialGradient></defs><path d="M 16 27 C 16 27, 5 19, 5 11 C 5 7, 8 5, 11 5 C 13 5, 15 7, 16 8 C 17 7, 19 5, 21 5 C 24 5, 27 7, 27 11 C 27 19, 16 27, 16 27 Z" fill="url(#h4)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="11" cy="11" rx="2.5" ry="2" fill="#fff" opacity="0.6" transform="rotate(-20 11 11)"/></svg>`,
+            `<svg viewBox="0 0 32 32"><defs><linearGradient id="p5" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#ddccff"/><stop offset="50%" style="stop-color:#9966ff"/><stop offset="100%" style="stop-color:#5533aa"/></linearGradient></defs><polygon points="16,3 26,9 26,22 16,28 6,22 6,9" fill="url(#p5)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,8 22,12 22,20 16,24 10,20 10,12" fill="rgba(255,255,255,0.2)" stroke="#fff" stroke-width="1" opacity="0.6"/><line x1="16" y1="3" x2="16" y2="28" stroke="#fff" stroke-width="1" opacity="0.5"/></svg>`
+        ];
+        
+        for (let i = 0; i < TYPES; i++) {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = SHAPES_SVG[i];
+            svgTemplates[i] = wrapper.firstChild;
+        }
+        
+        const posCache = [];
+        for (let r = 0; r < SIZE; r++) {
+            posCache[r] = [];
+            for (let c = 0; c < SIZE; c++) {
+                posCache[r][c] = { x: c * STEP + GAP, y: r * STEP + GAP };
+            }
+        }
+        
+        let board = [];
+        let crystals = [];
+        let score = 0, level = 1, moves = 30, target = 1000;
+        let selected = null, isProcessing = false, combo = 0;
+        
+        const boardEl = document.getElementById('game-board');
+        const scoreEl = document.getElementById('score');
+        const levelEl = document.getElementById('level');
+        const movesEl = document.getElementById('moves');
+        const targetEl = document.getElementById('target');
+        const comboEl = document.getElementById('combo-text');
+        const msgEl = document.getElementById('message');
+        const msgTitleEl = document.getElementById('msg-title');
+        const msgTextEl = document.getElementById('msg-text');
+        
+        const uiCache = { score: scoreEl, level: levelEl, moves: movesEl, target: targetEl };
+        
+        // ========== ИСПРАВЛЕНИЕ: корректное создание кристалла ==========
+        function createCrystalElement(type, row, col) {
+            const el = document.createElement('div');
+            el.className = 'crystal type-' + type;
+            el.dataset.r = row;
+            el.dataset.c = col;
+            el.appendChild(svgTemplates[type].cloneNode(true));
+            const pos = posCache[row][col];
+            el.style.left = pos.x + 'px';
+            el.style.top = pos.y + 'px';
+            return el;
+        }
+        
+        // ========== ИСПРАВЛЕНИЕ: обновление dataset при перемещении ==========
+        function updateCrystalPosition(el, newRow, newCol) {
+            el.dataset.r = newRow;
+            el.dataset.c = newCol;
+            const pos = posCache[newRow][newCol];
+            el.style.left = pos.x + 'px';
+            el.style.top = pos.y + 'px';
+        }
+        
+        function initBoard() {
+            boardEl.innerHTML = '';
+            board = [];
+            crystals = [];
+            
+            const fragment = document.createDocumentFragment();
+            
+            for (let row = 0; row < SIZE; row++) {
+                board[row] = [];
+                crystals[row] = [];
+                for (let col = 0; col < SIZE; col++) {
+                    let type;
+                    do {
+                        type = Math.floor(Math.random() * TYPES);
+                    } while (wouldMatch(row, col, type));
+                    
+                    board[row][col] = type;
+                    const el = createCrystalElement(type, row, col);
+                    fragment.appendChild(el);
+                    crystals[row][col] = el;
+                }
+            }
+            boardEl.appendChild(fragment);
+        }
+        
+        function wouldMatch(row, col, type) {
+            if (col >= 2 && board[row][col-1] === type && board[row][col-2] === type) return true;
+            if (row >= 2 && board[row-1][col] === type && board[row-2][col] === type) return true;
+            return false;
+        }
+        
+        function handleCrystalClick(row, col) {
+            if (isProcessing || moves <= 0) return;
+            
+            const el = crystals[row][col];
+            
+            if (!selected) {
+                selected = { row, col };
+                el.classList.add('selected');
+            } else {
+                const prevEl = crystals[selected.row][selected.col];
+                prevEl.classList.remove('selected');
+                
+                if (isAdjacent(selected, { row, col })) {
+                    trySwap(selected, { row, col });
+                } else {
+                    selected = { row, col };
+                    el.classList.add('selected');
+                    return;
+                }
+                
+                selected = null;
+            }
+        }
+        
+        function isAdjacent(a, b) {
+            const dr = a.row - b.row;
+            const dc = a.col - b.col;
+            return (dr === 1 || dr === -1) && dc === 0 || dr === 0 && (dc === 1 || dc === -1);
+        }
+        
+        async function trySwap(a, b) {
+            isProcessing = true;
+            
+            await animateSwap(a, b);
+            
+            const tempType = board[a.row][a.col];
+            board[a.row][a.col] = board[b.row][b.col];
+            board[b.row][b.col] = tempType;
+            
+            const tempEl = crystals[a.row][a.col];
+            crystals[a.row][a.col] = crystals[b.row][b.col];
+            crystals[b.row][b.col] = tempEl;
+            
+            // Обновляем dataset после свапа
+            updateCrystalPosition(crystals[a.row][a.col], a.row, a.col);
+            updateCrystalPosition(crystals[b.row][b.col], b.row, b.col);
+            
+            const matches = findMatches();
+            
+            if (matches.length > 0) {
+                moves--;
+                updateUI();
+                await processMatches(matches);
+            } else {
+                await animateSwap(a, b);
+                
+                const tempType = board[a.row][a.col];
+                board[a.row][a.col] = board[b.row][b.col];
+                board[b.row][b.col] = tempType;
+                
+                const tempEl = crystals[a.row][a.col];
+                crystals[a.row][a.col] = crystals[b.row][b.col];
+                crystals[b.row][b.col] = tempEl;
+                
+                updateCrystalPosition(crystals[a.row][a.col], a.row, a.col);
+                updateCrystalPosition(crystals[b.row][b.col], b.row, b.col);
+            }
+            
+            isProcessing = false;
+            checkGameState();
+        }
+        
+        function animateSwap(a, b) {
+            return new Promise(resolve => {
+                const elA = crystals[a.row][a.col];
+                const elB = crystals[b.row][b.col];
+                const posA = posCache[a.row][a.col];
+                const posB = posCache[b.row][b.col];
+                
+                const dx = posB.x - posA.x;
+                const dy = posB.y - posA.y;
+                
+                elA.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+                elB.style.transform = `translate3d(${-dx}px, ${-dy}px, 0)`;
+                
+                setTimeout(() => {
+                    elA.style.transform = '';
+                    elB.style.transform = '';
+                    updateCrystalPosition(elA, b.row, b.col);
+                    updateCrystalPosition(elB, a.row, a.col);
+                    resolve();
+                }, 180);
+            });
+        }
+        
+        function findMatches() {
+            const matched = new Set();
+            
+            for (let row = 0; row < SIZE; row++) {
+                const rowArr = board[row];
+                let col = 0;
+                while (col < SIZE) {
+                    const type = rowArr[col];
+                    if (type === -1) { col++; continue; }
+                    let end = col + 1;
+                    while (end < SIZE && rowArr[end] === type) end++;
+                    const len = end - col;
+                    if (len >= 3) {
+                        for (let i = col; i < end; i++) matched.add(row * SIZE + i);
+                    }
+                    col = end;
+                }
+            }
+            
+            for (let col = 0; col < SIZE; col++) {
+                let row = 0;
+                while (row < SIZE) {
+                    const type = board[row][col];
+                    if (type === -1) { row++; continue; }
+                    let end = row + 1;
+                    while (end < SIZE && board[end][col] === type) end++;
+                    const len = end - row;
+                    if (len >= 3) {
+                        for (let i = row; i < end; i++) matched.add(i * SIZE + col);
+                    }
+                    row = end;
+                }
+            }
+            
+            const result = new Array(matched.size);
+            let idx = 0;
+            matched.forEach(v => {
+                result[idx++] = { row: (v / SIZE) | 0, col: v % SIZE };
+            });
+            return result;
+        }
+        
+        function checkSwapMatches(r1, c1, r2, c2) {
+            const cellsToCheck = [[r1,c1],[r2,c2]];
+            
+            for (const [row, col] of cellsToCheck) {
+                const type = board[row][col];
+                let left = col, right = col;
+                while (left > 0 && board[row][left-1] === type) left--;
+                while (right < SIZE-1 && board[row][right+1] === type) right++;
+                if (right - left + 1 >= 3) return true;
+                
+                let up = row, down = row;
+                while (up > 0 && board[up-1][col] === type) up--;
+                while (down < SIZE-1 && board[down+1][col] === type) down++;
+                if (down - up + 1 >= 3) return true;
+            }
+            return false;
+        }
+        
+        async function processMatches(matches) {
+            combo = 0;
+            
+            while (matches.length > 0) {
+                combo++;
+                score += matches.length * 10 * combo;
+                
+                if (combo > 1) showCombo(combo);
+                
+                for (const { row, col } of matches) {
+                    const el = crystals[row][col];
+                    if (el) el.classList.add('matching');
+                }
+                
+                await wait(250);
+                
+                for (const { row, col } of matches) {
+                    const el = crystals[row][col];
+                    if (el) {
+                        el.remove();
+                        board[row][col] = -1;
+                        crystals[row][col] = null;
+                    }
+                }
+                
+                await dropCrystals();
+                await fillFromTop();
+                
+                updateUI();
+                matches = findMatches();
+            }
+        }
+        
+        // ========== ИСПРАВЛЕНИЕ: корректное падение кристаллов ==========
+        async function dropCrystals() {
+            const drops = [];
+            
+            for (let col = 0; col < SIZE; col++) {
+                let writeRow = SIZE - 1;
+                for (let row = SIZE - 1; row >= 0; row--) {
+                    if (board[row][col] !== -1) {
+                        if (row !== writeRow) {
+                            // Перемещаем кристалл в массиве
+                            const el = crystals[row][col];
+                            board[writeRow][col] = board[row][col];
+                            crystals[writeRow][col] = el;
+                            board[row][col] = -1;
+                            crystals[row][col] = null;
+                            
+                            // Вычисляем смещение для анимации
+                            const oldY = posCache[row][col].y;
+                            const newY = posCache[writeRow][col].y;
+                            const dy = newY - oldY;
+                            
+                            // Устанавливаем transform для анимации
+                            el.style.transform = `translate3d(0, ${-dy}px, 0)`;
+                            drops.push({ el, newRow: writeRow, newCol: col });
+                        }
+                        writeRow--;
+                    }
+                }
+            }
+            
+            if (drops.length > 0) {
+                // Форсим reflow
+                void drops[0].el.offsetWidth;
+                
+                // Запускаем анимацию - убираем transform, кристалл "падает" на место
+                for (const { el } of drops) {
+                    el.style.transition = 'transform 0.25s ease-in';
+                    el.style.transform = 'translate3d(0, 0, 0)';
+                }
+                
+                await wait(270);
+                
+                // После анимации обновляем позиции и dataset
+                for (const { el, newRow, newCol } of drops) {
+                    el.style.transition = '';
+                    el.style.transform = '';
+                    updateCrystalPosition(el, newRow, newCol);
+                }
+            }
+        }
+        
+        // ========== ИСПРАВЛЕНИЕ: корректное заполнение сверху ==========
+        async function fillFromTop() {
+            const newCrystals = [];
+            const fragment = document.createDocumentFragment();
+            
+            for (let col = 0; col < SIZE; col++) {
+                // Считаем количество пустых клеток в колонке
+                let emptyCount = 0;
+                for (let row = 0; row < SIZE; row++) {
+                    if (board[row][col] === -1) emptyCount++;
+                }
+                
+                // Заполняем пустые клетки новыми кристаллами
+                let fallIdx = 0;
+                for (let row = 0; row < SIZE; row++) {
+                    if (board[row][col] === -1) {
+                        const type = Math.floor(Math.random() * TYPES);
+                        board[row][col] = type;
+                        
+                        const el = createCrystalElement(type, row, col);
+                        
+                        // Начинаем выше экрана (над полем)
+                        const targetY = posCache[row][col].y;
+                        const startY = targetY - (emptyCount - fallIdx) * STEP;
+                        el.style.top = startY + 'px';
+                        
+                        fragment.appendChild(el);
+                        crystals[row][col] = el;
+                        newCrystals.push({ el, row, col });
+                        fallIdx++;
+                    }
+                }
+            }
+            
+            if (newCrystals.length > 0) {
+                boardEl.appendChild(fragment);
+                
+                // Форсим reflow чтобы браузер увидел начальную позицию
+                void newCrystals[0].el.offsetWidth;
+                
+                // Анимируем падение на финальную позицию
+                for (const { el, row, col } of newCrystals) {
+                    el.style.transition = 'top 0.3s ease-in';
+                    el.style.top = posCache[row][col].y + 'px';
+                }
+                
+                await wait(320);
+                
+                // Убираем transition
+                for (const { el } of newCrystals) {
+                    el.style.transition = '';
+                }
+            }
+        }
+        
+        function showCombo(n) {
+            comboEl.textContent = 'КОМБО x' + n + '!';
+            comboEl.classList.remove('show');
+            void comboEl.offsetWidth;
+            comboEl.classList.add('show');
+        }
+        
+        function checkGameState() {
+            if (score >= target) {
+                msgTitleEl.textContent = 'УРОВЕНЬ ПРОЙДЕН!';
+                msgTextEl.textContent = 'Счёт: ' + score;
+                msgEl.style.display = 'block';
+            } else if (moves <= 0) {
+                msgTitleEl.textContent = 'ИГРА ОКОНЧЕНА';
+                msgTextEl.textContent = 'Счёт: ' + score + ' / ' + target;
+                msgEl.style.display = 'block';
+            } else if (!hasValidMoves()) {
+                shuffleBoard();
+            }
+        }
+        
+        function hasValidMoves() {
+            for (let row = 0; row < SIZE; row++) {
+                for (let col = 0; col < SIZE; col++) {
+                    if (col < SIZE - 1) {
+                        const t = board[row][col];
+                        board[row][col] = board[row][col+1];
+                        board[row][col+1] = t;
+                        const has = checkSwapMatches(row, col, row, col+1);
+                        board[row][col+1] = board[row][col];
+                        board[row][col] = t;
+                        if (has) return true;
+                    }
+                    if (row < SIZE - 1) {
+                        const t = board[row][col];
+                        board[row][col] = board[row+1][col];
+                        board[row+1][col] = t;
+                        const has = checkSwapMatches(row, col, row+1, col);
+                        board[row+1][col] = board[row][col];
+                        board[row][col] = t;
+                        if (has) return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function updateUI() {
+            uiCache.score.textContent = score;
+            uiCache.level.textContent = level;
+            uiCache.moves.textContent = moves;
+            uiCache.target.textContent = target;
+        }
+        
+        function newGame() {
+            score = 0; level = 1; moves = 30; target = 1000;
+            combo = 0; selected = null; isProcessing = false;
+            msgEl.style.display = 'none';
+            initBoard();
+            updateUI();
+        }
+        
+        function nextLevel() {
+            level++; moves = 30; target = 1000 + (level - 1) * 500;
+            combo = 0; selected = null; isProcessing = false;
+            msgEl.style.display = 'none';
+            initBoard();
+            updateUI();
+        }
+        
+        function shuffleBoard() {
+            if (isProcessing) return;
+            
+            const types = [];
+            for (let row = 0; row < SIZE; row++) {
+                for (let col = 0; col < SIZE; col++) {
+                    types.push(board[row][col]);
+                    if (crystals[row][col]) crystals[row][col].remove();
+                }
+            }
+            
+            for (let i = types.length - 1; i > 0; i--) {
+                const j = (Math.random() * (i + 1)) | 0;
+                const t = types[i]; types[i] = types[j]; types[j] = t;
+            }
+            
+            const fragment = document.createDocumentFragment();
+            let idx = 0;
+            for (let row = 0; row < SIZE; row++) {
+                for (let col = 0; col < SIZE; col++) {
+                    let type = types[idx++];
+                    while (wouldMatch(row, col, type)) {
+                        type = Math.floor(Math.random() * TYPES);
+                    }
+                    board[row][col] = type;
+                    const el = createCrystalElement(type, row, col);
+                    fragment.appendChild(el);
+                    crystals[row][col] = el;
+                }
+            }
+            boardEl.appendChild(fragment);
+        }
+        
+        function showHint() {
+            if (isProcessing) return;
+            
+            for (let row = 0; row < SIZE; row++) {
+                for (let col = 0; col < SIZE; col++) {
+                    if (col < SIZE - 1) {
+                        const t = board[row][col];
+                        board[row][col] = board[row][col+1];
+                        board[row][col+1] = t;
+                        if (checkSwapMatches(row, col, row, col+1)) {
+                            board[row][col+1] = board[row][col];
+                            board[row][col] = t;
+                            highlightHint(row, col, row, col+1);
+                            return;
+                        }
+                        board[row][col+1] = board[row][col];
+                        board[row][col] = t;
+                    }
+                    if (row < SIZE - 1) {
+                        const t = board[row][col];
+                        board[row][col] = board[row+1][col];
+                        board[row+1][col] = t;
+                        if (checkSwapMatches(row, col, row+1, col)) {
+                            board[row+1][col] = board[row][col];
+                            board[row][col] = t;
+                            highlightHint(row, col, row+1, col);
+                            return;
+                        }
+                        board[row+1][col] = board[row][col];
+                        board[row][col] = t;
+                    }
+                }
+            }
+        }
+        
+        function highlightHint(r1, c1, r2, c2) {
+            crystals[r1][c1].classList.add('hint');
+            crystals[r2][c2].classList.add('hint');
+            setTimeout(() => {
+                if (crystals[r1][c1]) crystals[r1][c1].classList.remove('hint');
+                if (crystals[r2][c2]) crystals[r2][c2].classList.remove('hint');
+            }, 1200);
+        }
+        
+        function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+        
+        boardEl.addEventListener('click', (e) => {
+            const el = e.target.closest('.crystal');
+            if (!el) return;
+            const row = parseInt(el.dataset.r);
+            const col = parseInt(el.dataset.c);
+            handleCrystalClick(row, col);
+        });
+        
+        let touchStart = null;
+        
+        boardEl.addEventListener('touchstart', (e) => {
+            const el = e.target.closest('.crystal');
+            if (!el) return;
+            touchStart = { el, x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }, { passive: true });
+        
+        boardEl.addEventListener('touchend', (e) => {
+            if (!touchStart) return;
+            const dx = e.changedTouches[0].clientX - touchStart.x;
+            const dy = e.changedTouches[0].clientY - touchStart.y;
+            
+            if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+                touchStart = null;
+                return;
+            }
+            
+            const row = parseInt(touchStart.el.dataset.r);
+            const col = parseInt(touchStart.el.dataset.c);
+            
+            let targetRow = row, targetCol = col;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                targetCol += dx > 0 ? 1 : -1;
+            } else {
+                targetRow += dy > 0 ? 1 : -1;
+            }
+            
+            if (targetRow >= 0 && targetRow < SIZE && targetCol >= 0 && targetCol < SIZE) {
+                if (!selected) {
+                    selected = { row, col };
+                    touchStart.el.classList.add('selected');
+                    setTimeout(() => {
+                        if (selected) {
+                            const prevEl = crystals[selected.row][selected.col];
+                            if (prevEl) prevEl.classList.remove('selected');
+                            trySwap(selected, { row: targetRow, col: targetCol });
+                            selected = null;
+                        }
+                    }, 60);
+                }
+            }
+            
+            touchStart = null;
+        }, { passive: true });
+        
+        newGame();
+    </script>
+</body>
+</html>
