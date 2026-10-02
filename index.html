@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>3 в ряд</title>
+    
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function(m,e,t,r,i,k,a){
+            m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+            m[i].l=1*new Date();
+            for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+            k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+        })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=113282768', 'ym');
+
+        ym(113282768, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    </script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/113282768" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+    <!-- /Yandex.Metrika counter -->
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
@@ -227,6 +242,14 @@
     </div>
 
     <script>
+        // === ФУНКЦИЯ ОТПРАВКИ СОБЫТИЙ В ЯНДЕКС.МЕТРИКУ ===
+        function sendMatch3Event(eventName, params) {
+            if (typeof ym !== 'undefined') {
+                ym(113282768, 'reachGoal', eventName, params);
+                console.log('Метрика: отправлено событие', eventName, params);
+            }
+        }
+
         const SIZE = 8;
         const TYPES = 6;
         const CELL_SIZE = 42;
@@ -278,7 +301,6 @@
         
         const uiCache = { score: scoreEl, level: levelEl, moves: movesEl, target: targetEl };
         
-        // ========== ИСПРАВЛЕНИЕ: корректное создание кристалла ==========
         function createCrystalElement(type, row, col) {
             const el = document.createElement('div');
             el.className = 'crystal type-' + type;
@@ -291,7 +313,6 @@
             return el;
         }
         
-        // ========== ИСПРАВЛЕНИЕ: обновление dataset при перемещении ==========
         function updateCrystalPosition(el, newRow, newCol) {
             el.dataset.r = newRow;
             el.dataset.c = newCol;
@@ -374,7 +395,6 @@
             crystals[a.row][a.col] = crystals[b.row][b.col];
             crystals[b.row][b.col] = tempEl;
             
-            // Обновляем dataset после свапа
             updateCrystalPosition(crystals[a.row][a.col], a.row, a.col);
             updateCrystalPosition(crystals[b.row][b.col], b.row, b.col);
             
@@ -519,7 +539,6 @@
             }
         }
         
-        // ========== ИСПРАВЛЕНИЕ: корректное падение кристаллов ==========
         async function dropCrystals() {
             const drops = [];
             
@@ -528,19 +547,16 @@
                 for (let row = SIZE - 1; row >= 0; row--) {
                     if (board[row][col] !== -1) {
                         if (row !== writeRow) {
-                            // Перемещаем кристалл в массиве
                             const el = crystals[row][col];
                             board[writeRow][col] = board[row][col];
                             crystals[writeRow][col] = el;
                             board[row][col] = -1;
                             crystals[row][col] = null;
                             
-                            // Вычисляем смещение для анимации
                             const oldY = posCache[row][col].y;
                             const newY = posCache[writeRow][col].y;
                             const dy = newY - oldY;
                             
-                            // Устанавливаем transform для анимации
                             el.style.transform = `translate3d(0, ${-dy}px, 0)`;
                             drops.push({ el, newRow: writeRow, newCol: col });
                         }
@@ -550,10 +566,8 @@
             }
             
             if (drops.length > 0) {
-                // Форсим reflow
                 void drops[0].el.offsetWidth;
                 
-                // Запускаем анимацию - убираем transform, кристалл "падает" на место
                 for (const { el } of drops) {
                     el.style.transition = 'transform 0.25s ease-in';
                     el.style.transform = 'translate3d(0, 0, 0)';
@@ -561,7 +575,6 @@
                 
                 await wait(270);
                 
-                // После анимации обновляем позиции и dataset
                 for (const { el, newRow, newCol } of drops) {
                     el.style.transition = '';
                     el.style.transform = '';
@@ -570,19 +583,16 @@
             }
         }
         
-        // ========== ИСПРАВЛЕНИЕ: корректное заполнение сверху ==========
         async function fillFromTop() {
             const newCrystals = [];
             const fragment = document.createDocumentFragment();
             
             for (let col = 0; col < SIZE; col++) {
-                // Считаем количество пустых клеток в колонке
                 let emptyCount = 0;
                 for (let row = 0; row < SIZE; row++) {
                     if (board[row][col] === -1) emptyCount++;
                 }
                 
-                // Заполняем пустые клетки новыми кристаллами
                 let fallIdx = 0;
                 for (let row = 0; row < SIZE; row++) {
                     if (board[row][col] === -1) {
@@ -591,7 +601,6 @@
                         
                         const el = createCrystalElement(type, row, col);
                         
-                        // Начинаем выше экрана (над полем)
                         const targetY = posCache[row][col].y;
                         const startY = targetY - (emptyCount - fallIdx) * STEP;
                         el.style.top = startY + 'px';
@@ -606,11 +615,8 @@
             
             if (newCrystals.length > 0) {
                 boardEl.appendChild(fragment);
-                
-                // Форсим reflow чтобы браузер увидел начальную позицию
                 void newCrystals[0].el.offsetWidth;
                 
-                // Анимируем падение на финальную позицию
                 for (const { el, row, col } of newCrystals) {
                     el.style.transition = 'top 0.3s ease-in';
                     el.style.top = posCache[row][col].y + 'px';
@@ -618,7 +624,6 @@
                 
                 await wait(320);
                 
-                // Убираем transition
                 for (const { el } of newCrystals) {
                     el.style.transition = '';
                 }
@@ -634,10 +639,24 @@
         
         function checkGameState() {
             if (score >= target) {
+                // ОТПРАВЛЯЕМ СОБЫТИЕ: Уровень пройден
+                sendMatch3Event('level_complete', {
+                    level: level,
+                    score: score,
+                    moves_left: moves
+                });
+                
                 msgTitleEl.textContent = 'УРОВЕНЬ ПРОЙДЕН!';
                 msgTextEl.textContent = 'Счёт: ' + score;
                 msgEl.style.display = 'block';
             } else if (moves <= 0) {
+                // ОТПРАВЛЯЕМ СОБЫТИЕ: Игра окончена
+                sendMatch3Event('game_over', {
+                    final_score: score,
+                    level_reached: level,
+                    target_was: target
+                });
+
                 msgTitleEl.textContent = 'ИГРА ОКОНЧЕНА';
                 msgTextEl.textContent = 'Счёт: ' + score + ' / ' + target;
                 msgEl.style.display = 'block';
